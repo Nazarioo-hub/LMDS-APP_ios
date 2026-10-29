@@ -1,0 +1,99 @@
+# Codemagic — LMDS App
+# Documentação: https://docs.codemagic.io/yaml-quick-start/building-a-flutter-app/
+#
+# Workflows:
+#   ios-testflight      → IPA assinado e enviado para o TestFlight (precisa de conta Apple Developer paga)
+#   ios-sem-assinatura  → IPA sem assinatura, para instalar com Sideloadly/AltStore (não precisa de conta paga)
+#   android-apk         → APK de release (assinado com a chave de debug) para instalar à mão
+#
+# Antes do primeiro build do ios-testflight, ver README.md (secção "Codemagic").
+
+definitions:
+  ambiente: &ambiente
+    flutter: 3.41.7
+    xcode: latest
+    cocoapods: default
+
+  pub_get: &pub_get
+    name: Dependências Flutter
+    script: flutter pub get
+
+  testes: &testes
+    name: Análise e testes
+    script: |
+      flutter analyze
+      flutter test
+
+  pods: &pods
+    name: CocoaPods
+    script: |
+      cd ios
+      pod install --repo-update
+
+workflows:
+  ios-testflight:
+    name: iOS → TestFlight
+    instance_type: mac_mini_m2
+    max_build_duration: 60
+    integrations:
+      app_store_connect: LMDS ASC
+    environment:
+      <<: *ambiente
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: pt.lmds.lmdsApp.antoniopedro
+    scripts:
+      - *pub_get
+      - *testes
+      - *pods
+      - name: Aplicar perfis de assinatura ao projeto Xcode
+        script: xcode-project use-profiles
+      - name: Build IPA
+        script: |
+          flutter build ipa --release \
+            --build-number=$BUILD_NUMBER \
+            --export-options-plist=/Users/builder/export_options.plist
+    artifacts:
+      - build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
+      - $HOME/Library/Developer/Xcode/DerivedData/**/Build/**/*.dSYM
+    publishing:
+      app_store_connect:
+        auth: integration
+        submit_to_testflight: true
+
+  ios-sem-assinatura:
+    name: iOS (sem assinatura, para sideload)
+    instance_type: mac_mini_m2
+    max_build_duration: 45
+    environment:
+      <<: *ambiente
+    scripts:
+      - *pub_get
+      - *testes
+      - *pods
+      - name: Build sem assinatura
+        script: flutter build ios --release --no-codesign --build-number=$BUILD_NUMBER
+      - name: Empacotar como IPA
+        script: |
+          mkdir -p build/ios/sideload/Payload
+          cp -R build/ios/iphoneos/Runner.app build/ios/sideload/Payload/
+          cd build/ios/sideload
+          zip -qr LMDS-sem-assinatura.ipa Payload
+    artifacts:
+      - build/ios/sideload/*.ipa
+
+  android-apk:
+    name: Android APK
+    instance_type: mac_mini_m2
+    max_build_duration: 30
+    environment:
+      flutter: 3.41.7
+      java: 17
+    scripts:
+      - *pub_get
+      - *testes
+      - name: Build APK
+        script: flutter build apk --release --build-number=$BUILD_NUMBER
+    artifacts:
+      - build/app/outputs/flutter-apk/app-release.apk
