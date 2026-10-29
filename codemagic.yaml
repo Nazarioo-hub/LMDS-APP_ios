@@ -1,16 +1,12 @@
-# Codemagic — LMDS App
+# Codemagic — LMDS App para SideStore
 # Documentação: https://docs.codemagic.io/yaml-quick-start/building-a-flutter-app/
 #
-# Sem assinatura nenhuma:
-#   ios-sem-assinatura  → IPA sem assinatura, para instalar com Sideloadly/AltStore
-#   android-apk         → APK de release para instalar à mão
+#   ios-sidestore  → IPA sem assinatura; o SideStore assina-o com o teu Apple ID ao instalar
+#   android-apk    → APK de release para instalar à mão
+#
+# Nada aqui precisa de conta Apple Developer nem de certificados.
 
 definitions:
-  ambiente: &ambiente
-    flutter: 3.41.7
-    xcode: latest
-    cocoapods: default
-
   pub_get: &pub_get
     name: Dependências Flutter
     script: flutter pub get
@@ -21,33 +17,50 @@ definitions:
       flutter analyze
       flutter test
 
-  pods: &pods
-    name: CocoaPods
-    script: |
-      cd ios
-      pod install --repo-update
-
 workflows:
-  ios-sem-assinatura:
-    name: iOS (sem assinatura)
+  ios-sidestore:
+    name: iOS para SideStore
     instance_type: mac_mini_m2
     max_build_duration: 45
     environment:
-      <<: *ambiente
+      flutter: 3.41.7
+      xcode: latest
+      cocoapods: default
     scripts:
       - *pub_get
       - *testes
-      - *pods
-      - name: Build sem assinatura
-        script: flutter build ios --release --no-codesign --build-number=$BUILD_NUMBER
-      - name: Empacotar como IPA
+      - name: CocoaPods
         script: |
-          mkdir -p build/ios/sideload/Payload
-          cp -R build/ios/iphoneos/Runner.app build/ios/sideload/Payload/
-          cd build/ios/sideload
-          zip -qr LMDS-sem-assinatura.ipa Payload
+          cd ios
+          pod install --repo-update
+      - name: Build release sem assinatura
+        script: flutter build ios --release --no-codesign --build-number=$BUILD_NUMBER
+      - name: Empacotar IPA para o SideStore
+        script: |
+          set -e
+          APP=build/ios/iphoneos/Runner.app
+          SAIDA=build/ios/sidestore
+          VERSAO=$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$APP/Info.plist")
+
+          # O SideStore volta a assinar tudo; restos de assinatura só atrapalham.
+          find "$APP" -name "_CodeSignature" -type d -prune -exec rm -rf {} +
+          find "$APP" -name "embedded.mobileprovision" -delete
+
+          rm -rf "$SAIDA" && mkdir -p "$SAIDA/Payload"
+          cp -R "$APP" "$SAIDA/Payload/"
+          cd "$SAIDA"
+          zip -qry "LMDS-$VERSAO-$BUILD_NUMBER.ipa" Payload
+          rm -rf Payload
+      - name: Verificar IPA
+        script: |
+          set -e
+          IPA=$(ls build/ios/sidestore/*.ipa)
+          unzip -l "$IPA" | grep -q "Payload/Runner.app/Runner$"
+          unzip -p "$IPA" Payload/Runner.app/Runner > /tmp/Runner
+          lipo -info /tmp/Runner
+          echo "OK: $IPA ($(du -h "$IPA" | cut -f1))"
     artifacts:
-      - build/ios/sideload/*.ipa
+      - build/ios/sidestore/*.ipa
 
   android-apk:
     name: Android APK

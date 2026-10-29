@@ -25,11 +25,11 @@ O ficheiro [`.github/workflows/compilar.yml`](.github/workflows/compilar.yml) co
 
 ### Codemagic
 
-A configuração está em [`codemagic.yaml`](codemagic.yaml), com os workflows `ios-sem-assinatura` e `android-apk`. Para os usar: entrar em [codemagic.io](https://codemagic.io) com a conta GitHub, **Add application** → `LMDS-APP_ios` → **codemagic.yaml** → **Start new build**.
+A configuração está em [`codemagic.yaml`](codemagic.yaml), com os workflows `ios-sidestore` e `android-apk`. Para os usar: entrar em [codemagic.io](https://codemagic.io) com a conta GitHub, **Add application** → `LMDS-APP_ios` → **codemagic.yaml** → **Start new build**.
 
-### Instalar o IPA sem assinatura
+### Instalar com o SideStore
 
-O `.ipa` do workflow `ios-sem-assinatura` fica nos artefactos do build. Instala-se com [Sideloadly](https://sideloadly.io) ou [AltStore](https://altstore.io), que o assinam com o teu Apple ID. Com Apple ID grátis a app expira ao fim de 7 dias e tem de ser reinstalada.
+O `.ipa` do workflow `ios-sidestore` fica nos artefactos do build do Codemagic. Passa-o para o iPhone (Ficheiros/AirDrop) e abre-o no SideStore → **My Apps → +**. O SideStore assina-o com o teu Apple ID; com Apple ID grátis a app tem de ser renovada no SideStore a cada 7 dias e só podes ter 3 apps ativas.
 
 ### Notas
 
