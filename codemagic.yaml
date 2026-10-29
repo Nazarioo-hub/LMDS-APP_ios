@@ -1,12 +1,9 @@
 # Codemagic — LMDS App
 # Documentação: https://docs.codemagic.io/yaml-quick-start/building-a-flutter-app/
 #
-# Workflows:
-#   ios-testflight      → IPA assinado e enviado para o TestFlight (precisa de conta Apple Developer paga)
-#   ios-sem-assinatura  → IPA sem assinatura, para instalar com Sideloadly/AltStore (não precisa de conta paga)
-#   android-apk         → APK de release (assinado com a chave de debug) para instalar à mão
-#
-# Antes do primeiro build do ios-testflight, ver README.md (secção "Codemagic").
+# Sem assinatura nenhuma:
+#   ios-sem-assinatura  → IPA sem assinatura, para instalar com Sideloadly/AltStore
+#   android-apk         → APK de release para instalar à mão
 
 definitions:
   ambiente: &ambiente
@@ -31,39 +28,8 @@ definitions:
       pod install --repo-update
 
 workflows:
-  ios-testflight:
-    name: iOS → TestFlight
-    instance_type: mac_mini_m2
-    max_build_duration: 60
-    integrations:
-      app_store_connect: LMDS ASC
-    environment:
-      <<: *ambiente
-      ios_signing:
-        distribution_type: app_store
-        bundle_identifier: pt.lmds.lmdsApp.antoniopedro
-    scripts:
-      - *pub_get
-      - *testes
-      - *pods
-      - name: Aplicar perfis de assinatura ao projeto Xcode
-        script: xcode-project use-profiles
-      - name: Build IPA
-        script: |
-          flutter build ipa --release \
-            --build-number=$BUILD_NUMBER \
-            --export-options-plist=/Users/builder/export_options.plist
-    artifacts:
-      - build/ios/ipa/*.ipa
-      - /tmp/xcodebuild_logs/*.log
-      - $HOME/Library/Developer/Xcode/DerivedData/**/Build/**/*.dSYM
-    publishing:
-      app_store_connect:
-        auth: integration
-        submit_to_testflight: true
-
   ios-sem-assinatura:
-    name: iOS (sem assinatura, para sideload)
+    name: iOS (sem assinatura)
     instance_type: mac_mini_m2
     max_build_duration: 45
     environment:
